@@ -1,19 +1,19 @@
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
-const socketManager = require("./socketManager");
+const socketManager = require("../socketManager");
 require("dotenv").config();
 const cron = require("node-cron");
-const ipoPool = require("./db"); // <-- Original IPO pool
-const loginPool = require("./db_auth"); // <-- New login pool
+const ipoPool = require("../db"); // <-- Original IPO pool
+const loginPool = require("../db_auth"); // <-- New login pool
 
-const { syncIpos } = require("./controllers/IpoController");
-const backfillIpoDetails = require("./backfilling");
-const { DetailsIPO } = require("./controllers/DetailsIpoController");
+const { syncIpos } = require("../controllers/IpoController");
+const backfillIpoDetails = require("../backfilling");
+const { DetailsIPO } = require("../controllers/DetailsIpoController");
 
-const ipoRoutes = require("./routes/IpoRoutes");
-const detailsIpoRoutes = require("./routes/DetailsIpoRoutes");
-const authRoutes = require('./routes/authRoutes');
+const ipoRoutes = require("../routes/IpoRoutes");
+const detailsIpoRoutes = require("../routes/DetailsIpoRoutes");
+const authRoutes = require('../routes/authRoutes');
 
 const app = express();
 const port = process.env.PORT || 5000;
