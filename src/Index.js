@@ -5,7 +5,7 @@ const socketManager = require("../socketManager");
 require("dotenv").config();
 const cron = require("node-cron");
 const ipoPool = require("../db"); // <-- Original IPO pool
-const loginPool = require("../db_auth"); // <-- New login pool
+const loginPool = require("../db_auth");
 
 const { syncIpos } = require("../controllers/IpoController");
 const backfillIpoDetails = require("../backfilling");
