@@ -3,12 +3,14 @@ const { Pool } = require("pg");
 require("dotenv").config();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // from .env
-  max: 5, // 👈 cap it to 5 (well below Neon’s 20 limit)
-  idleTimeoutMillis: 30000, // release idle connections after 30s
+  connectionString: process.env.DATABASE_URL,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 15000, // ⏱️ 15 seconds
   ssl: {
-    rejectUnauthorized: false, // needed for Neon
+    rejectUnauthorized: false,
   },
 });
+
 
 module.exports = pool;
