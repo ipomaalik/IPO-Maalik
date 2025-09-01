@@ -221,7 +221,7 @@ async function upsertIpoTx(
   let newSubscription = rawIpo.subscription;
 
   // Subscription scrape (outside DB)
-  if (newStatus === "OPEN" && rawIpo.id && newName) {
+  if ((newStatus === "OPEN" || newStatus === "LIVE") && rawIpo.id && newName) {
     try {
       const formattedName = formatNameForUrl(newName);
       const scrapeUrl = `https://www.ipopremium.in/view/ipo/${rawIpo.id}/${formattedName}`;
@@ -235,20 +235,27 @@ async function upsertIpoTx(
       const $ = cheerio.load(pageHtml);
       let scrapedSubscription = null;
 
-      const totalHeader = $("b")
-        .filter(function () {
-          return $(this).text().trim() === "Total";
-        })
-        .first();
+      // Find subscription card
+      const subscriptionCard = $("h2.card-title")
+        .filter((i, el) => $(el).text().toLowerCase().includes("subscription"))
+        .closest(".card");
 
-      if (totalHeader.length) {
-        const subscriptionValue = totalHeader
-          .closest("tr")
-          .find("td:last-child b")
-          .text()
-          .trim();
-        if (subscriptionValue && !isNaN(parseFloat(subscriptionValue))) {
-          scrapedSubscription = subscriptionValue;
+      if (subscriptionCard.length) {
+        // First subscription table
+        const subscriptionTable = subscriptionCard.find("table").first();
+
+        // Look for a row that contains "Total"
+        const totalRow = subscriptionTable.find("tr").filter((i, el) => {
+          return $(el).text().toLowerCase().includes("total");
+        }).first();
+
+        if (totalRow.length) {
+          // Get last cell (Times column)
+          const times = totalRow.find("td, th").last().text().trim();
+
+          if (times && !isNaN(parseFloat(times))) {
+            scrapedSubscription = times;
+          }
         }
       }
 
@@ -267,7 +274,8 @@ async function upsertIpoTx(
     newSubscription === null ||
     newSubscription === undefined ||
     newSubscription === "" ||
-    (typeof newSubscription === "string" && newSubscription.toLowerCase() === "n/a")
+    (typeof newSubscription === "string" &&
+      newSubscription.toLowerCase() === "n/a")
   ) {
     newSubscription = matchedDb?.subscription || null;
   }

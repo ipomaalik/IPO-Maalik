@@ -49,8 +49,9 @@ async function backfillIpoDetails() {
     console.error("❌ Backfill failed, rolled back transaction:", err.message);
   } finally {
     // 🔑 Clean shutdown
-    await pool.end();
-    process.exit(0);
+      if (require.main === module) {
+        process.exit(0);
+      }
   }
 }
 
