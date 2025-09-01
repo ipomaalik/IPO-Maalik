@@ -4,7 +4,7 @@ const http = require("http");
 const socketManager = require("../socketManager");
 require("dotenv").config();
 const cron = require("node-cron");
-const ipoPool = require("../db"); // <-- Original IPO pool
+const ipoPool = require("../db");
 const loginPool = require("../db_auth");
 
 const { syncIpos } = require("../controllers/IpoController");
@@ -13,7 +13,7 @@ const { DetailsIPO } = require("../controllers/DetailsIpoController");
 
 const ipoRoutes = require("../routes/IpoRoutes");
 const detailsIpoRoutes = require("../routes/DetailsIpoRoutes");
-const authRoutes = require('../routes/authRoutes');
+const authRoutes = require("../routes/authRoutes");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -36,33 +36,41 @@ server.listen(port, () => {
   console.log(`🚀 Server is running on http://localhost:${port}`);
 });
 
+// ------------------ HELPER: IST Logger ------------------
+function logWithIST(message) {
+  const now = new Date();
+  const istTime = new Date(now.getTime() + (5 * 60 + 30) * 60000); // UTC + 5:30
+  const timestamp = istTime.toISOString().replace("T", " ").slice(0, 19);
+  console.log(`[${timestamp} IST] ${message}`);
+}
+
 // ------------------ HELPER: Wake DB ------------------
 async function wakeDb(pool, name) {
   try {
     const result = await pool.query("SELECT 1");
-    console.log(`🌙 ${name} DB is awake:`, result.rows);
+    logWithIST(`🌙 ${name} DB is awake: ${JSON.stringify(result.rows)}`);
     return true;
   } catch (err) {
-    console.error(`⚠️ ${name} DB wake check failed:`, err.message);
+    logWithIST(`⚠️ ${name} DB wake check failed: ${err.message}`);
     return false;
   }
 }
 
 // ------------------ CRON JOBS ------------------
 
-// 🔹 New job to keep the Login DB awake
+// 🔹 Keep Login DB awake (every 10 min)
 cron.schedule("*/10 * * * *", async () => {
-  console.log("⏳ Starting Login DB wake-up call...");
+  logWithIST("⏳ Login DB wake-up cron triggered...");
   await wakeDb(loginPool, "Login");
 });
 
-// 🔹 Mainboard IPOs: every 15 minutes (GMP + subscription)
+// 🔹 Mainboard IPOs: every 15 minutes
 cron.schedule("*/15 * * * *", async () => {
-  console.log("⏳ Starting Mainboard IPO sync...");
+  logWithIST("⏳ Mainboard IPO sync cron triggered...");
 
   const dbAwake = await wakeDb(ipoPool, "IPO");
   if (!dbAwake) {
-    console.log("❌ Skipping Mainboard sync because DB is unavailable.");
+    logWithIST("❌ Skipping Mainboard sync because DB is unavailable.");
     return;
   }
 
@@ -72,29 +80,28 @@ cron.schedule("*/15 * * * *", async () => {
     await syncIpos("mainboard", "live");
     await syncIpos("mainboard", "upcoming");
     await syncIpos("mainboard", "closed");
-
-    console.log("✅ Mainboard IPO sync completed.");
+    logWithIST("✅ Mainboard IPO sync completed.");
   } catch (err) {
-    console.error("❌ Mainboard cron failed:", err.message);
+    logWithIST(`❌ Mainboard cron failed: ${err.message}`);
   }
 });
 
-// 🔹 SME IPOs: hourly, but only during market hours (10 AM–6 PM IST)
-cron.schedule("0 * * * *", async () => {
+// 🔹 SME IPOs: every 3 hours (only during 10 AM–6 PM IST)
+cron.schedule("0 */3 * * *", async () => {
   const now = new Date();
   const currentHourUTC = now.getUTCHours();
 
   // ✅ Market hours in UTC: 5 AM – 12 PM
   if (currentHourUTC < 5 || currentHourUTC > 12) {
-    console.log("⏳ Skipping SME sync (outside market hours).");
+    logWithIST("⏳ Skipping SME sync (outside market hours).");
     return;
   }
 
-  console.log("⏳ Starting SME IPO sync...");
+  logWithIST("⏳ SME IPO sync cron triggered...");
 
   const dbAwake = await wakeDb(ipoPool, "IPO");
   if (!dbAwake) {
-    console.log("❌ Skipping SME sync because DB is unavailable.");
+    logWithIST("❌ Skipping SME sync because DB is unavailable.");
     return;
   }
 
@@ -104,20 +111,19 @@ cron.schedule("0 * * * *", async () => {
     await syncIpos("sme", "live");
     await syncIpos("sme", "upcoming");
     await syncIpos("sme", "closed");
-
-    console.log("✅ SME sync completed.");
+    logWithIST("✅ SME sync completed.");
   } catch (err) {
-    console.error("❌ SME cron failed:", err.message);
+    logWithIST(`❌ SME cron failed: ${err.message}`);
   }
 });
 
-// 🔹 Backfilling & Detailed IPOs: 3 times/day (8 AM, 2 PM, 8 PM UTC)
+// 🔹 Backfilling & Details IPOs: 3 times/day (8 AM, 2 PM, 8 PM UTC)
 cron.schedule("0 8,14,20 * * *", async () => {
-  console.log("⏳ Starting backfilling & details IPO sync...");
+  logWithIST("⏳ Backfilling & details IPO cron triggered...");
 
   const dbAwake = await wakeDb(ipoPool, "IPO");
   if (!dbAwake) {
-    console.log("❌ Skipping backfilling because DB is unavailable.");
+    logWithIST("❌ Skipping backfilling because DB is unavailable.");
     return;
   }
 
@@ -126,9 +132,8 @@ cron.schedule("0 8,14,20 * * *", async () => {
   try {
     await backfillIpoDetails();
     await DetailsIPO();
-
-    console.log("✅ Backfilling & details IPO sync completed.");
+    logWithIST("✅ Backfilling & details IPO sync completed.");
   } catch (err) {
-    console.error("❌ Backfilling cron failed:", err.message);
+    logWithIST(`❌ Backfilling cron failed: ${err.message}`);
   }
 });

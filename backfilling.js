@@ -1,18 +1,12 @@
 // backfilling.js
 
-/**
- * @file Synchronizes data from 'ipos' to 'details_ipo'.
- * Ensures missing IPOs in details_ipo are inserted.
- */
-
 const pool = require("./db"); // Shared pool
 
 async function backfillIpoDetails() {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  console.log("🔍 Checking for missing IPO records...");
 
-    console.log("Finding records in ipos table that are missing from details_ipo...");
+  try {
+    await pool.query("BEGIN");
 
     const query = `
       SELECT
@@ -27,16 +21,15 @@ async function backfillIpoDetails() {
           d.details_ipo_id IS NULL;
     `;
 
-    const result = await client.query(query);
-    const recordsToInsert = result.rows;
+    const { rows: recordsToInsert } = await pool.query(query);
 
     if (recordsToInsert.length === 0) {
-      console.log("No new records found. The details_ipo table is up to date.");
-      await client.query("COMMIT");
+      console.log("✅ No new records found. details_ipo is up to date.");
+      await pool.query("COMMIT");
       return;
     }
 
-    console.log(`Found ${recordsToInsert.length} new records to insert.`);
+    console.log(`📥 Found ${recordsToInsert.length} new records to insert.`);
 
     for (const record of recordsToInsert) {
       const insertQuery = `
@@ -45,21 +38,25 @@ async function backfillIpoDetails() {
         ON CONFLICT (details_ipo_id) DO NOTHING;
       `;
       const values = [record.ipo_name, record.details_ipo_id, record.url_rewrite];
-      await client.query(insertQuery, values);
-      console.log(`Inserted details for IPO: ${record.ipo_name}`);
+      await pool.query(insertQuery, values);
+      console.log(`   ➕ Inserted IPO: ${record.ipo_name}`);
     }
 
-    await client.query("COMMIT");
-    console.log("All new IPO details have been successfully inserted.");
+    await pool.query("COMMIT");
+    console.log("🎉 All missing IPO details inserted successfully.");
   } catch (err) {
-    await client.query("ROLLBACK");
-    console.error(
-      "An error occurred during backfilling. The transaction has been rolled back.",
-      err
-    );
+    await pool.query("ROLLBACK");
+    console.error("❌ Backfill failed, rolled back transaction:", err.message);
   } finally {
-    client.release(); // ✅ important to release back to pool
+    // 🔑 Clean shutdown
+    await pool.end();
+    process.exit(0);
   }
+}
+
+// run directly if called from CLI
+if (require.main === module) {
+  backfillIpoDetails();
 }
 
 module.exports = backfillIpoDetails;
