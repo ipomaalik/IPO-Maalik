@@ -147,7 +147,7 @@ cron.schedule("0 */3 * * *", async () => {
 });
 
 // 🔹 Backfilling & Details IPOs: 3 times/day (8 AM, 2 PM, 8 PM UTC)
-cron.schedule("0 8,14,20 * * *", async () => {
+cron.schedule("0 11,14,18 * * *", async () => {
   logWithIST("⏳ Backfilling & details IPO cron triggered...");
 
   const dbAwake = await wakeDbWithRetry(ipoPool, "IPO");
